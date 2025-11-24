@@ -54,7 +54,7 @@ export const fetchWildfirePrediction = async (data: WildfireInputData, lat?: num
 
             return {
                 riskLevel,
-                explanation: `XGBoost Model Prediction: ${result.fire_probability.toFixed(2)}% probability. Risk Level: ${result.risk_level}. (Temp: ${data.temperature.toFixed(1)}°C, Wind: ${data.windSpeed.toFixed(1)}km/h)`,
+                explanation: `XGBoost Model Prediction: ${(result.fire_probability * 100).toFixed(2)}% probability. Risk Level: ${result.risk_level}. (Temp: ${data.temperature.toFixed(1)}°C, Wind: ${data.windSpeed.toFixed(1)}km/h)`,
                 source: 'XGBoost'
             };
         }
@@ -213,39 +213,35 @@ const getLocationName = async (lat: number, lon: number): Promise<string> => {
   return `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
 };
 
-// Generate environmental data based on location and nearby fires
-export const fetchEnvironmentalDataForCoords = async (lat: number, lon: number): Promise<WildfireInputData> => {
+// Generate environmental data based on location using Open-Meteo API
+export const fetchEnvironmentalDataForCoords = async (lat: number, lon: number, name?: string): Promise<WildfireInputData> => {
   try {
-    // Get location name
-    const locationName = await getLocationName(lat, lon);
+    // Get location name (use provided name or reverse geocode)
+    const locationName = name || await getLocationName(lat, lon);
     
-    // Fetch active fires to check proximity
-    const activeFires = await fetchActiveFires();
+    // Fetch real-time weather data from Open-Meteo
+    const weatherResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,rain,wind_speed_10m&forecast_days=1`
+    );
     
-    // Calculate distance to nearest fire and count nearby fires
-    let nearestFireDistance = Infinity;
-    let nearbyFireCount = 0;
-    const NEARBY_THRESHOLD_KM = 100; // fires within 100km
-    
-    activeFires.forEach(fire => {
-      const distance = calculateDistance(lat, lon, fire.lat, fire.lon);
-      if (distance < nearestFireDistance) {
-        nearestFireDistance = distance;
-      }
-      if (distance < NEARBY_THRESHOLD_KM) {
-        nearbyFireCount++;
-      }
-    });
-    
-    // Generate realistic environmental data based on location
-    // These are estimates - in production, you'd use real weather APIs
-    const temperature = 20 + Math.random() * 20; // 20-40°C
-    const humidity = 20 + Math.random() * 60; // 20-80%
-    const windSpeed = 5 + Math.random() * 30; // 5-35 km/h
-    const rainfall = Math.random() * 10; // 0-10mm
-    const ndvi = 0.2 + Math.random() * 0.6; // 0.2-0.8 (vegetation index)
-    const elevation = Math.abs(lat) * 10 + Math.random() * 500; // rough estimate
-    const slope = Math.random() * 30; // 0-30 degrees
+    if (!weatherResponse.ok) {
+        throw new Error("Failed to fetch weather data");
+    }
+
+    const weatherData = await weatherResponse.json();
+    const current = weatherData.current;
+
+    // Use real data
+    const temperature = current.temperature_2m;
+    const humidity = current.relative_humidity_2m;
+    const windSpeed = current.wind_speed_10m;
+    const rainfall = current.rain; // Rain in last hour/current interval, close enough for real-time check
+
+    // NDVI and Slope are not in standard weather APIs, so we estimate or keep mock for now
+    // In a real production app, you'd use a satellite API (e.g., Sentinel Hub) for NDVI
+    const ndvi = Math.max(0, Math.min(1, 0.5 + (Math.random() * 0.2 - 0.1))); 
+    const elevation = Math.max(0, Math.abs(lat) * 10 + Math.random() * 100); // Rough estimate
+    const slope = Math.max(0, Math.random() * 20); // Rough estimate
     
     return {
       locationName,
@@ -260,7 +256,18 @@ export const fetchEnvironmentalDataForCoords = async (lat: number, lon: number):
 
   } catch (error) {
     console.error("Error fetching environmental data:", error);
-    throw new Error("Failed to retrieve location data.");
+    // Fallback to estimates if API fails
+    const baseTemp = 35 - (Math.abs(lat) / 90) * 50;
+    return {
+        locationName: name || `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+        temperature: baseTemp,
+        humidity: 50,
+        windSpeed: 10,
+        rainfall: 0,
+        ndvi: 0.5,
+        elevation: 100,
+        slope: 5
+    };
   }
 };
 

@@ -7,6 +7,7 @@ import GlobeComponent from './components/GlobeComponent';
 import RiskResultDisplay from './components/RiskResultDisplay';
 import CoordinateInput from './components/CoordinateInput';
 import ModelAccuracyDisplay from './components/ModelAccuracyDisplay';
+import AnalysisOverlay from './components/AnalysisOverlay';
 import { evaluateModel, EvaluationMetrics } from './services/geminiService';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -80,12 +81,12 @@ function App() {
     return () => clearInterval(intervalId);
   }, [runAnalysis]);
 
-  const analyzeCustomLocation = useCallback(async (lat: number, lon: number) => {
+  const analyzeCustomLocation = useCallback(async (lat: number, lon: number, name?: string) => {
     setIsAnalyzingCustom(true);
     setError(null);
     try {
       const id = `custom_${lat.toFixed(4)}_${lon.toFixed(4)}`;
-      const envData = await fetchEnvironmentalDataForCoords(lat, lon);
+      const envData = await fetchEnvironmentalDataForCoords(lat, lon, name);
       const prediction = await fetchWildfirePrediction(envData, lat, lon);
       
       const customHotspot: AnalyzedHotspot = {
@@ -107,12 +108,12 @@ function App() {
     } finally {
       setIsAnalyzingCustom(false);
     }
-  }, []);
+  }, [allActiveFires]);
 
   return (
-    <div className="h-screen w-screen flex font-sans overflow-hidden">
+    <div className="h-screen w-screen flex flex-col md:flex-row font-sans overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-[450px] flex-shrink-0 glass-panel flex flex-col z-10 shadow-2xl relative">
+      <aside className="w-full md:w-[450px] h-[40vh] md:h-full flex-shrink-0 glass-panel flex flex-col z-10 shadow-2xl relative order-2 md:order-1">
         <header className="p-6 border-b border-white/5 bg-gradient-to-r from-slate-900/50 to-transparent">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-orange-500/20 rounded-lg border border-orange-500/30">
@@ -199,6 +200,14 @@ function App() {
           customPrediction={customPrediction}
           onMapClick={analyzeCustomLocation}
         />
+        
+        {/* Detailed Analysis Overlay */}
+        {focusedHotspot && (
+            <AnalysisOverlay 
+                hotspot={focusedHotspot} 
+                onClose={() => setFocusedHotspot(null)} 
+            />
+        )}
       </main>
     </div>
   );

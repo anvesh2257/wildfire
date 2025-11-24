@@ -63,7 +63,7 @@ const RiskResultDisplay: React.FC<RiskResultDisplayProps> = ({ hotspot, onSelect
         className={`p-5 rounded-xl border transition-all duration-300 cursor-pointer group relative overflow-hidden ${isSelected ? `bg-blue-900/20 border-blue-500/50 ring-1 ring-blue-500/20` : `glass-card border-white/5 hover:border-white/10`}`}
     >
       {isSelected && <div className="absolute inset-0 bg-blue-500/5 pointer-events-none"></div>}
-      <div className="flex items-center justify-between gap-4 mb-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
          <div className="flex-1 min-w-0">
             <h3 className={`text-md font-semibold truncate ${styles.textColor}`} title={hotspot.envData.locationName}>
               {hotspot.envData.locationName}
@@ -84,9 +84,11 @@ const RiskResultDisplay: React.FC<RiskResultDisplayProps> = ({ hotspot, onSelect
       </div>
       <div className="space-y-2">
         <p className="text-gray-300 text-sm">{result?.explanation || 'AI is currently assessing environmental factors...'}</p>
-        <div className="text-xs text-gray-400 border-t border-gray-700/50 pt-2">
-            <span className="font-semibold text-gray-300">NASA Fire Intensity:</span> {hotspot.fireData.brightness.toFixed(1)} K
-        </div>
+        {hotspot.fireData.brightness > 0 && (
+            <div className="text-xs text-gray-400 border-t border-gray-700/50 pt-2">
+                <span className="font-semibold text-gray-300">NASA Fire Intensity:</span> {hotspot.fireData.brightness.toFixed(1)} K
+            </div>
+        )}
       </div>
     </div>
   );

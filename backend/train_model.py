@@ -26,18 +26,26 @@ def generate_synthetic_data(n_samples=5000):
     
     # Target Variable (Fire Risk: 0=No Fire, 1=Fire)
     # Logic: High Temp + Low Humidity + High Wind = High Risk
+    # Base risk from individual factors
     risk_score = (
-        (temperature / 50) * 0.4 + 
-        ((100 - humidity) / 100) * 0.3 + 
+        (temperature / 50) * 0.3 + 
+        ((100 - humidity) / 100) * 0.2 + 
         (wind_speed / 100) * 0.2 + 
         (ndvi) * 0.1
     )
+    
+    # Interaction Terms (Critical Combinations)
+    # High Temp (>30) AND Low Humidity (<30)
+    risk_score += ((temperature > 30) & (humidity < 30)) * 0.2
+    
+    # High Wind (>20) AND Low Humidity (<30)
+    risk_score += ((wind_speed > 20) & (humidity < 30)) * 0.2
     
     # Add some noise
     risk_score += np.random.normal(0, 0.05, n_samples)
     
     # Threshold for fire occurrence (simulating ground truth)
-    fire_occurrence = (risk_score > 0.6).astype(int)
+    fire_occurrence = (risk_score > 0.55).astype(int)
     
     df = pd.DataFrame({
         'temperature': temperature,

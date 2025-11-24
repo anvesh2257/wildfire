@@ -1,14 +1,44 @@
 import React, { useState } from 'react';
 
 interface CoordinateInputProps {
-  onAnalyze: (lat: number, lon: number) => void;
+  onAnalyze: (lat: number, lon: number, name?: string) => void;
   isAnalyzing: boolean;
 }
 
 const CoordinateInput: React.FC<CoordinateInputProps> = ({ onAnalyze, isAnalyzing }) => {
   const [latitude, setLatitude] = useState<string>('');
   const [longitude, setLongitude] = useState<string>('');
+  const [locationName, setLocationName] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locationName.trim()) return;
+
+    setIsSearching(true);
+    setValidationError('');
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}`);
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        setLatitude(lat);
+        setLongitude(lon);
+        // Optional: Update location name to the full matched name
+        // setLocationName(display_name); 
+        onAnalyze(parseFloat(lat), parseFloat(lon), display_name);
+      } else {
+        setValidationError('Location not found');
+      }
+    } catch (err) {
+      setValidationError('Error searching for location');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,13 +63,42 @@ const CoordinateInput: React.FC<CoordinateInputProps> = ({ onAnalyze, isAnalyzin
       return;
     }
 
-    onAnalyze(lat, lon);
+    onAnalyze(lat, lon, locationName);
   };
 
   return (
     <div className="p-4 border-b border-gray-700 bg-gray-800/50">
       <h3 className="text-sm font-semibold text-gray-300 mb-3">Custom Location Analysis</h3>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      
+      {/* Location Search */}
+      <form onSubmit={handleSearch} className="mb-4">
+        <label className="block text-xs text-gray-400 mb-1">Search Location</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={locationName}
+            onChange={(e) => setLocationName(e.target.value)}
+            placeholder="e.g., California, Delhi"
+            className="flex-1 px-2 py-1.5 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+            disabled={isAnalyzing || isSearching}
+          />
+          <button
+            type="submit"
+            disabled={isAnalyzing || isSearching || !locationName}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
+          >
+            {isSearching ? '...' : 'Search'}
+          </button>
+        </div>
+      </form>
+
+      <div className="relative flex py-2 items-center">
+        <div className="flex-grow border-t border-gray-700"></div>
+        <span className="flex-shrink-0 mx-2 text-xs text-gray-500">OR ENTER COORDINATES</span>
+        <div className="flex-grow border-t border-gray-700"></div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-3 mt-2">
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Latitude</label>

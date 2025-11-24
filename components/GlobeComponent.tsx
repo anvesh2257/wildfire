@@ -28,16 +28,37 @@ const GlobeComponent: React.FC<GlobeComponentProps> = ({
     onMapClick 
 }) => {
   const globeEl = useRef<GlobeMethods | undefined>(undefined);
-  const [globeWidth, setGlobeWidth] = useState(window.innerWidth);
-  const [globeHeight, setGlobeHeight] = useState(window.innerHeight);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [countries, setCountries] = useState({ features: [] });
 
   useEffect(() => {
-    const handleResize = () => {
-      setGlobeWidth(window.innerWidth);
-      setGlobeHeight(window.innerHeight);
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        });
+      }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Initial size
+    updateDimensions();
+
+    const observer = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    
+    // Load country data
+    fetch('//unpkg.com/world-atlas/countries-110m.json')
+      .then(res => res.json())
+      .then(data => setCountries(data));
+
+    return () => observer.disconnect();
   }, []);
 
   // Fly to focused hotspot
@@ -46,7 +67,7 @@ const GlobeComponent: React.FC<GlobeComponentProps> = ({
       globeEl.current.pointOfView({
         lat: focusedHotspot.fireData.lat,
         lng: focusedHotspot.fireData.lon,
-        altitude: 1.5 // Zoom level
+        altitude: 0.5 // Closer zoom for better detail
       }, 2000);
     }
   }, [focusedHotspot]);
@@ -61,18 +82,29 @@ const GlobeComponent: React.FC<GlobeComponentProps> = ({
   }, [analyzedHotspots, customPrediction]);
 
   return (
-    <div className="cursor-move">
+    <div ref={containerRef} className="w-full h-full cursor-move">
       <Globe
         ref={globeEl}
-        width={globeWidth}
-        height={globeHeight}
+        width={dimensions.width}
+        height={dimensions.height}
         
         // Visuals
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+        
+        // Detailed Tiles (OpenStreetMap)
+        globeTileUrl="//tile.openstreetmap.org/{z}/{x}/{y}.png"
+        
         atmosphereColor="#3a228a"
         atmosphereAltitude={0.2}
+
+        // Polygons (Countries)
+        polygonsData={countries.features}
+        polygonCapColor={() => 'rgba(0,0,0,0)'} // Transparent fill
+        polygonSideColor={() => 'rgba(0,0,0,0)'}
+        polygonStrokeColor={() => '#555555'} // Light grey borders
+        polygonAltitude={0.005}
         
         // Active Fires (Points)
         pointsData={allActiveFires}
